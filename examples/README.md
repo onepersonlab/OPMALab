@@ -1,18 +1,41 @@
-# 📂 案例 / Examples
+# OnePersonLab-Agents Examples
 
-真实的端到端使用案例，展示三省六部处理完整旨意的全流程。
+Real-world end-to-end use cases demonstrating the full workflow of OnePersonLab-Agents handling research directives.
 
-| # | 案例 | 旨意内容 | 涉及部门 | 复杂度 |
-|---|------|---------|----------|--------|
-| 1 | [竞品分析](competitive-analysis.md) | "分析 CrewAI vs AutoGen vs LangGraph" | 中书→门下→户部+兵部+礼部 | ⭐⭐⭐ |
-| 2 | [代码审查](code-review.md) | "审查 FastAPI 代码的安全性" | 中书→门下→兵部+刑部 | ⭐⭐ |
-| 3 | [周报生成](weekly-report.md) | "生成本周工程团队周报" | 中书→门下→户部+礼部 | ⭐⭐ |
+| # | Example | Directive | Involved Roles | Complexity |
+|---|---------|-----------|----------------|------------|
+| 1 | [Drug Discovery Platform](drug-discovery.md) | "Build an AI-driven drug discovery platform" | Lab Director → Planning → Review → Operations → 4 PIs | ⭐⭐⭐⭐ |
+| 2 | [Climate Impact Assessment](climate-assessment.md) | "Assess climate change impact on crop yields" | Lab Director → Planning → Review → Operations → 3 PIs | ⭐⭐⭐ |
+| 3 | [Materials Design](materials-design.md) | "Design novel polymer composite for flexible electronics" | Lab Director → Planning → Review → Operations → 3 PIs | ⭐⭐⭐ |
 
-每个案例包含：
-- 📜 **圣旨**：原始指令
-- 📋 **中书省规划**：任务拆解方案
-- 🔍 **门下省审议**：审核意见（含封驳/返工记录）
-- ⚔️ **各部执行结果**：每个部门的产出摘要
-- 📮 **最终奏折**：尚书省汇总的完整报告
+Each example includes:
+- 📜 **Directive**: Original instruction from Human User
+- 📋 **Planning Office Plan**: Task decomposition strategy
+- 🔍 **Review Board Decision**: Approval/veto with feedback
+- 📮 **Operations Office Assignment**: Sub-task distribution to PIs
+- 🔬 **PI Deliverables**: Output from each discipline PI
+- 📊 **Final Report**: Consolidated results and recommendations
 
-> 💡 这些案例基于真实运行记录整理，任务 ID 和时间戳已脱敏。
+> 💡 These examples are based on real usage patterns. Task IDs and timestamps are anonymized.
+
+---
+
+## How to Use These Examples
+
+1. **Read the directive** — Understand what the Human User requested
+2. **Review the plan** — See how Planning Office decomposed the task
+3. **Check the review** — Learn what Review Board looked for
+4. **Study PI outputs** — See deliverables from each discipline
+5. **Apply to your work** — Adapt patterns for your own research
+
+---
+
+## Want More Examples?
+
+Contributions welcome! See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
+
+Ideal example characteristics:
+- Real research directive (not contrived)
+- Multi-discipline involvement (2+ PIs)
+- Clear deliverables from each PI
+- Complete workflow (directive → plan → review → execution → report)
