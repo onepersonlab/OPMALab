@@ -1,175 +1,268 @@
-# 🚀 快速上手指南
+# 🚀 Getting Started with SciLab-Agents
 
-> 从零开始，5 分钟搭建你的三省六部 AI 协同系统
+> From zero to running in 5 minutes
 
 ---
 
-## 第一步：安装 OpenClaw
+## Prerequisites
 
-三省六部基于 [OpenClaw](https://openclaw.ai) 运行，请先安装：
+Before installing SciLab-Agents, ensure you have:
+
+- **OpenClaw** installed and initialized
+- **Python 3.9+** available
+- **Git** for cloning the repository
+
+---
+
+## Step 1: Install OpenClaw
+
+SciLab-Agents runs on [OpenClaw](https://openclaw.ai). Install it first:
 
 ```bash
 # macOS
 brew install openclaw
 
-# 或下载安装包
+# Or download from
 # https://openclaw.ai/download
 ```
 
-安装完成后初始化：
+Initialize OpenClaw:
 
 ```bash
 openclaw init
 ```
 
-## 第二步：克隆并安装三省六部
+Follow the prompts to configure your API keys and preferences.
+
+---
+
+## Step 2: Clone and Install SciLab-Agents
 
 ```bash
-git clone https://github.com/cft0808/edict.git
-cd edict
+# Clone repository
+git clone https://github.com/onepersonlab/onepersonlab-agents.git
+cd onepersonlab-agents
+
+# Run installer
 chmod +x install.sh && ./install.sh
 ```
 
-安装脚本会自动完成：
-- ✅ 创建 12 个 Agent Workspace（`~/.openclaw/workspace-*`）
-- ✅ 写入各省部 SOUL.md 人格文件
-- ✅ 注册 Agent 及权限矩阵到 `openclaw.json`
-- ✅ 配置旨意数据清洗规则
-- ✅ 初始化数据目录
-- ✅ 执行首次数据同步
-- ✅ 重启 Gateway 使配置生效
+The installer automatically:
+- ✅ Creates 12 Agent Workspaces (`~/.openclaw/workspace-*`)
+- ✅ Writes SOUL.md personality files for each role
+- ✅ Registers agents with permission matrix to `openclaw.json`
+- ✅ Initializes data directory with demo task
+- ✅ Runs first data sync
+- ✅ Restarts Gateway
 
-## 第三步：配置消息渠道
+---
 
-在 OpenClaw 中配置消息渠道（Feishu / Telegram / Signal），将 `taizi`（太子）Agent 设为旨意入口。太子会自动分拣闲聊与指令，指令类消息提炼标题后转发中书省。
+## Step 3: Configure Messaging Channel
+
+Configure your preferred messaging channel (Feishu / Telegram / Signal) in OpenClaw:
 
 ```bash
-# 查看当前渠道
+# List current channels
 openclaw channels list
 
-# 添加飞书渠道（入口设为太子）
-openclaw channels add --type feishu --agent taizi
+# Add Feishu channel (Lab Director as entry point)
+openclaw channels add feishu --agent lab_director
 ```
 
-参考 OpenClaw 文档：https://docs.openclaw.ai/channels
+The Lab Director agent will be your primary contact for all research directives.
 
-## 第四步：启动服务
+---
+
+## Step 4: Start Services
+
+### Start Data Refresh Loop (Background)
 
 ```bash
-# 终端 1：数据刷新循环（每 15 秒同步）
-bash scripts/run_loop.sh
+bash scripts/run_loop.sh &
+```
 
-# 终端 2：看板服务器
+This keeps the dashboard synchronized with OpenClaw runtime data every 15 seconds.
+
+### Start Dashboard Server
+
+```bash
 python3 dashboard/server.py
+```
 
-# 打开浏览器
+### Open Dashboard
+
+```bash
 open http://127.0.0.1:7891
 ```
 
-> 💡 **提示**：`run_loop.sh` 每 15 秒自动同步数据。可用 `&` 后台运行。
-
-## 第五步：发送第一道旨意
-
-通过消息渠道发送任务（太子会自动识别并转发到中书省）：
-
-```
-请帮我用 Python 写一个文本分类器：
-1. 使用 scikit-learn
-2. 支持多分类
-3. 输出混淆矩阵
-4. 写完整的文档
-```
-
-## 第六步：观察执行过程
-
-打开看板 http://127.0.0.1:7891
-
-1. **📋 旨意看板** — 观察任务在各状态之间流转
-2. **🔭 省部调度** — 查看各部门工作分布
-3. **📜 奏折阁** — 任务完成后自动归档为奏折
-
-任务流转路径：
-```
-收件 → 太子分拣 → 中书规划 → 门下审议 → 已派发 → 执行中 → 已完成
-```
+You should see the SciLab Dashboard with:
+- **Research Dashboard**: Active directives by status
+- **Dept Coordination**: Current workload by department
+- **Team Overview**: Agent performance metrics
+- **Archive**: Completed directives
 
 ---
 
-## 🎯 进阶用法
+## Step 5: Send Your First Directive
 
-### 使用圣旨模板
+### Via Messaging
 
-> 看板 → 📜 旨库 → 选择模板 → 填写参数 → 下旨
+Send a message to Lab Director via your configured channel:
 
-9 个预设模板：周报生成 · 代码审查 · API 设计 · 竞品分析 · 数据报告 · 博客文章 · 部署方案 · 邮件文案 · 站会摘要
+```
+I want to build an AI platform for drug candidate discovery.
+I need expertise in chemistry, biology, and machine learning.
+Timeline: 2 weeks
+```
 
-### 切换 Agent 模型
+### What Happens Next
 
-> 看板 → ⚙️ 模型配置 → 选择新模型 → 应用更改
+1. **Lab Director** receives message → Triage (casual vs. directive)
+2. **Creates task** `SLC-YYYYMMDD-001` with summarized title
+3. **Forwards to Planning Office** for detailed planning
+4. **Planning Office** decomposes into sub-tasks:
+   - T01 (pi_chem): Compound library design
+   - T02 (pi_bio): Target validation plan
+   - T03 (pi_cs): ML model architecture
+5. **Review Board** reviews plan → Approves ✅
+6. **Operations Office** assigns to PIs → Monitors progress
+7. **PIs execute** → Report deliverables
+8. **Operations Office** consolidates → Reports to Lab Director
+9. **Lab Director** replies to you with final results
 
-约 5 秒后 Gateway 自动重启生效。
+### Track Progress
 
-### 管理技能
-
-> 看板 → 🛠️ 技能配置 → 查看已安装技能 → 点击添加新技能
-
-### 叫停 / 取消任务
-
-> 在旨意看板或任务详情中，点击 **⏸ 叫停** 或 **🚫 取消** 按钮
-
-### 订阅天下要闻
-
-> 看板 → 📰 天下要闻 → ⚙️ 订阅管理 → 选择分类 / 添加源 / 配飞书推送
+Watch the dashboard for real-time updates:
+- Task moves through states: Inbox → Planning → Review → Assigned → In Progress → Completed
+- Each department's workload visible in Dept Coordination tab
+- Full flow log in task detail view
 
 ---
 
-## ❓ 故障排查
+## Step 6: Explore Dashboard Features
 
-### 看板显示「服务器未启动」
+### Research Dashboard (📋)
+
+- View all active directives by status
+- Filter by department
+- Click any directive for detail view
+- Stop/Cancel/Resume actions available
+
+### Dept Coordination (🔭)
+
+- See current workload per department
+- Agent health status (🟢 Active 🟡 Stalled 🔴 Alert)
+- Model configuration per agent
+
+### Team Overview (👥)
+
+- Token consumption by agent
+- Completed tasks count
+- Activity timeline
+
+### Archive (📚)
+
+- Completed directives with full flow logs
+- Five-stage timeline: Directive → Planning → Review → Execution → Report
+- Export as Markdown
+
+### Models (⚙️)
+
+- Configure LLM per agent
+- Hot-swap without restart
+- Change log visible
+
+### Skills (🛠️)
+
+- View installed skills per agent
+- Add new skills from ClawHub
+
+---
+
+## 🐳 Docker Deployment (Optional)
+
+For isolated demo environment:
+
 ```bash
-# 确认服务器正在运行
+# Build image
+docker build -t onepersonlab/scilab-agents:latest .
+
+# Run container
+docker run -p 7891:7891 onepersonlab/scilab-agents:latest
+
+# Or use Docker Compose
+docker compose up
+```
+
+Access dashboard at http://localhost:7891
+
+> Note: Docker demo uses pre-seeded data. For full OpenClaw integration, use native installation.
+
+---
+
+## ⚠️ Troubleshooting
+
+### Gateway Not Starting
+
+```bash
+# Check status
+openclaw gateway status
+
+# Manual restart
+openclaw gateway restart
+```
+
+### Agents Not Showing
+
+```bash
+# Verify registration
+cat ~/.openclaw/openclaw.json | jq '.agents.list[] | .id'
+
+# Re-run installer
+./install.sh
+```
+
+### Dashboard Not Loading
+
+```bash
+# Check server logs
+# Look for errors in terminal where server.py is running
+
+# Verify port not in use
+lsof -i :7891
+
+# Restart server
 python3 dashboard/server.py
 ```
 
-### Agent 不响应
+### Data Not Syncing
+
 ```bash
-# 检查 Gateway 状态
-openclaw gateway status
+# Check run_loop.sh is running
+ps aux | grep run_loop.sh
 
-# 必要时重启
-openclaw gateway restart
-```
-
-### 数据不更新
-```bash
-# 检查刷新循环是否运行
-ps aux | grep run_loop
-
-# 手动执行一次同步
-python3 scripts/refresh_live_data.py
-```
-
-### 心跳显示红色 / 告警
-```bash
-# 检查对应 Agent 的进程
-openclaw agent status <agent-id>
-
-# 重启指定 Agent
-openclaw agent restart <agent-id>
-```
-
-### 模型切换后不生效
-等待约 5 秒让 Gateway 重启完成。仍不生效则：
-```bash
-python3 scripts/apply_model_changes.py
-openclaw gateway restart
+# Manual sync
+python3 scripts/sync_from_openclaw_runtime.py
+python3 scripts/sync_agent_config.py
 ```
 
 ---
 
-## 📚 更多资源
+## 📚 Next Steps
 
-- [🏠 项目首页](https://github.com/cft0808/edict)
-- [📖 README](../README.md)
-- [🤝 贡献指南](../CONTRIBUTING.md)
-- [💬 OpenClaw 文档](https://docs.openclaw.ai)
+- **Read [protocols/permissions.md](protocols/permissions.md)** for communication rules
+- **Explore [examples/](examples/)** for real use cases
+- **Join [Discord](https://discord.gg/clawd)** for community support
+- **Check [ClawHub](https://clawhub.com)** for new skills
+
+---
+
+## 🆘 Getting Help
+
+- **Documentation**: https://docs.openclaw.ai
+- **Issues**: https://github.com/onepersonlab/onepersonlab-agents/issues
+- **Discord**: https://discord.gg/clawd
+
+---
+
+> 🧪 Welcome to SciLab-Agents — where ancient wisdom meets modern research!
