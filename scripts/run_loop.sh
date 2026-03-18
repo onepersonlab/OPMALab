@@ -1,48 +1,48 @@
 #!/bin/bash
-# 三省六部 · 数据刷新循环
-# 用法: ./run_loop.sh [间隔秒数]  (默认 15)
+# SciLab-Agents · Data Refresh Loop
+# Usage: ./run_loop.sh [interval_seconds]  (default: 15)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTERVAL="${1:-15}"
-LOG="/tmp/sansheng_liubu_refresh.log"
-PIDFILE="/tmp/sansheng_liubu_refresh.pid"
+LOG="/tmp/scilab_refresh.log"
+PIDFILE="/tmp/scilab_refresh.pid"
 MAX_LOG_SIZE=$((10 * 1024 * 1024))  # 10MB
 
-# ── 单实例保护 ──
+# Single instance protection
 if [[ -f "$PIDFILE" ]]; then
   OLD_PID=$(cat "$PIDFILE" 2>/dev/null)
   if kill -0 "$OLD_PID" 2>/dev/null; then
-    echo "❌ 已有实例运行中 (PID=$OLD_PID)，退出"
+    echo "❌ Instance already running (PID=$OLD_PID), exiting"
     exit 1
   fi
   rm -f "$PIDFILE"
 fi
 echo $$ > "$PIDFILE"
 
-# ── 优雅退出 ──
+# Graceful exit
 cleanup() {
-  echo "$(date '+%H:%M:%S') [loop] 收到退出信号，清理中..." >> "$LOG"
+  echo "$(date '+%H:%M:%S') [loop] Received exit signal, cleaning up..." >> "$LOG"
   rm -f "$PIDFILE"
   exit 0
 }
 trap cleanup SIGINT SIGTERM EXIT
 
-# ── 日志轮转 ──
+# Log rotation
 rotate_log() {
   if [[ -f "$LOG" ]] && (( $(stat -f%z "$LOG" 2>/dev/null || stat -c%s "$LOG" 2>/dev/null || echo 0) > MAX_LOG_SIZE )); then
     mv "$LOG" "${LOG}.1"
-    echo "$(date '+%H:%M:%S') [loop] 日志已轮转" > "$LOG"
+    echo "$(date '+%H:%M:%S') [loop] Log rotated" > "$LOG"
   fi
 }
 
-echo "🏛️  三省六部数据刷新循环启动 (PID=$$)"
-echo "   脚本目录: $SCRIPT_DIR"
-echo "   间隔: ${INTERVAL}s"
-echo "   日志: $LOG"
-echo "   PID文件: $PIDFILE"
-echo "   按 Ctrl+C 停止"
+echo "🧪 SciLab-Agents Data Refresh Loop (PID=$$)"
+echo "   Script Dir: $SCRIPT_DIR"
+echo "   Interval: ${INTERVAL}s"
+echo "   Log: $LOG"
+echo "   PID File: $PIDFILE"
+echo "   Press Ctrl+C to stop"
 
 while true; do
   rotate_log

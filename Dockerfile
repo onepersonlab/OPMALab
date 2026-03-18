@@ -1,19 +1,19 @@
-# ⚔️ 三省六部 · Demo Dashboard
-# docker run -p 7891:7891 cft0808/sansheng-demo
+# 🧪 SciLab-Agents · Demo Dashboard
+# docker run -p 7891:7891 onepersonlab/scilab-agents
 # Then open: http://localhost:7891
 
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# 复制看板核心文件
+# Copy dashboard core files
 COPY dashboard/ ./dashboard/
 COPY scripts/ ./scripts/
 
-# 注入演示数据（data目录由demo_data提供）
+# Inject demo data
 COPY docker/demo_data/ ./data/
 
-# 非 root 用户运行
+# Non-root user
 RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser \
     && chown -R appuser:appuser /app
 USER appuser
