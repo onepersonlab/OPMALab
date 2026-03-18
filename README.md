@@ -39,14 +39,7 @@ python3 dashboard/server.py
 open http://127.0.0.1:7891
 ```
 
-### Option 2: Docker Demo
-
-```bash
-docker run -p 7891:7891 onepersonlab/onepersonlab-agents:latest
-open http://localhost:7891
-```
-
-### Option 3: Conversation-Based Setup
+### Option 2: Conversation-Based Setup
 
 **No commands. Just talk.**
 
@@ -306,12 +299,8 @@ onepersonlab-agents/
 │   ├── drug-discovery.md       # Drug discovery case
 │   ├── climate-assessment.md   # Climate case
 │   └── ...
-├── docker/                     # Docker configuration
-│   ├── Dockerfile
-│   └── demo_data/
 ├── tests/                      # End-to-end tests
 ├── install.sh                  # One-click installer
-├── docker-compose.yml          # Docker Compose config
 ├── README.md                   # This file
 └── LICENSE                     # MIT License
 ```

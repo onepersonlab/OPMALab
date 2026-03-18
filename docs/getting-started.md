@@ -179,27 +179,6 @@ Watch the dashboard for real-time updates:
 
 ---
 
-## 🐳 Docker Deployment (Optional)
-
-For isolated demo environment:
-
-```bash
-# Build image
-docker build -t onepersonlab/onepersonlab-agents:latest .
-
-# Run container
-docker run -p 7891:7891 onepersonlab/onepersonlab-agents:latest
-
-# Or use Docker Compose
-docker compose up
-```
-
-Access dashboard at http://localhost:7891
-
-> Note: Docker demo uses pre-seeded data. For full OpenClaw integration, use native installation.
-
----
-
 ## ⚠️ Troubleshooting
 
 ### Gateway Not Starting
