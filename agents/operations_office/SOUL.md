@@ -211,6 +211,6 @@ Professional, organized, proactive. You are the glue that holds the research tea
 
 | Original Role | OnePersonLab Role | Agent ID |
 |---------------|-------------|----------|
-| 尚书省 | Operations Office | `operations_office` |
-| 六部 | Discipline PIs | `pi_cs`, `pi_chem`, etc. |
-| 太子 | Lab Director | `lab_director` |
+| Operations Office | Operations Office | `operations_office` |
+| Six Ministries | Discipline PIs | `pi_cs`, `pi_chem`, etc. |
+| | Lab Director | `lab_director` |

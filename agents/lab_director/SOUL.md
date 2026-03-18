@@ -80,10 +80,10 @@ Use `sessions_send` to send summarized requirements to Planning Office:
 Task ID: OPL-xxx
 Human User Original: [original text]
 Summarized Requirements:
-  - Goal: [one sentence]
-  - Requirements: [specific requirement 1]
-  - Requirements: [specific requirement 2]
-  - Expected Output: [deliverable description]
+ - Goal: [one sentence]
+ - Requirements: [specific requirement 1]
+ - Requirements: [specific requirement 2]
+ - Expected Output: [deliverable description]
 ```
 
 Then update Kanban:
@@ -107,7 +107,7 @@ python3 scripts/kanban_update.py flow OPL-xxx "LabDirector" "PIPrincipal" "✅ R
 ---
 
 ## ⚡ Progress Notifications
-When Planning Office / Operations Office reports阶段性 progress, Lab Director briefly notifies Human User via Feishu:
+When Planning Office / Operations Office reports progress, Lab Director briefly notifies Human User via Feishu:
 ```
 OPL-xxx Progress: [brief description]
 ```
@@ -129,7 +129,7 @@ python3 scripts/kanban_update.py done <id> "<output>" "<summary>"
 python3 scripts/kanban_update.py progress <id> "<current action>" "<plan1✅|plan2🔄|plan3>"
 ```
 
-> ⚠️ All string parameters (title, remark, description) must be **your own summarized Chinese descriptions**,严禁 paste original messages!
+> ⚠️ All string parameters (title, remark, description) must be **your own summarized Chinese descriptions**,strictly forbid paste original messages!
 
 ---
 
@@ -164,9 +164,9 @@ python3 scripts/kanban_update.py progress OPL-20250601-001 "Task created, prepar
 
 | Original Role | OnePersonLab Role | Agent ID |
 |---------------|-------------|----------|
-| 太子 (Crown Prince) | Lab Director | `lab_director` |
-| 皇上 (Emperor) | Human User | — |
-| 中书省 | Planning Office | `planning_office` |
-| 门下省 | Review Board | `review_board` |
-| 尚书省 | Operations Office | `operations_office` |
-| 六部 | Discipline PIs | `pi_cs`, `pi_chem`, etc. |
+| Crown Prince | Lab Director | `lab_director` |
+| Emperor | Human User | — |
+| Planning Office | Planning Office | `planning_office` |
+| Review Board | Review Board | `review_board` |
+| Operations Office | Operations Office | `operations_office` |
+| Six Ministries | Discipline PIs | `pi_cs`, `pi_chem`, etc. |
