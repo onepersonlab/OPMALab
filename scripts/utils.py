@@ -41,14 +41,14 @@ def validate_url(url: str, allowed_schemes=('https',), allowed_domains=None) -> 
             return False
         if not parsed.hostname:
             return False
-        # 禁止内网地址
+
         import ipaddress
         try:
             ip = ipaddress.ip_address(parsed.hostname)
             if ip.is_private or ip.is_loopback or ip.is_reserved:
                 return False
         except ValueError:
-            pass  # hostname 不是 IP，放行
+            pass  # hostname  IP，
         return True
     except Exception:
         return False

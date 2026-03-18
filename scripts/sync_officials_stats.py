@@ -11,7 +11,7 @@ DATA = BASE / 'data'
 AGENTS_ROOT = pathlib.Path.home() / '.openclaw' / 'agents'
 OPENCLAW_CFG = pathlib.Path.home() / '.openclaw' / 'openclaw.json'
 
-# Anthropic 定价（每1M token，美元）
+# Anthropic （1M token，）
 MODEL_PRICING = {
     'anthropic/claude-sonnet-4-6':  {'in':3.0, 'out':15.0, 'cr':0.30, 'cw':3.75},
     'anthropic/claude-opus-4-5':    {'in':15.0,'out':75.0, 'cr':1.50, 'cw':18.75},
@@ -64,7 +64,7 @@ def get_model(agent_id):
     for a in cfg.get('agents',{}).get('list',[]):
         if a.get('id') == agent_id:
             return normalize_model(a.get('model', default), default)
-    # 兼容历史：太子曾使用 main 作为运行时 id
+    # ： main  id
     if agent_id == 'taizi':
         for a in cfg.get('agents',{}).get('list',[]):
             if a.get('id') == 'main':
@@ -135,7 +135,7 @@ def get_task_stats(org_label, tasks):
     active = [t for t in tasks if t.get('state') in ('Doing','Review','Assigned') and t.get('org')==org_label]
     fl = sum(1 for t in tasks for f in t.get('flow_log',[])
              if f.get('from')==org_label or f.get('to')==org_label)
-    # 参与的旨意（JJC）列表
+    # （JJC）
     participated = []
     for t in tasks:
         if not t['id'].startswith('JJC'): continue

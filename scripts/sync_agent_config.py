@@ -16,7 +16,7 @@ OPENCLAW_CFG = pathlib.Path.home() / '.openclaw' / 'openclaw.json'
 
 ID_LABEL = {
     'taizi':    {'label': '太子',   'role': '太子',     'duty': '飞书消息分拣与回奏',  'emoji': '🤴'},
-    'main':     {'label': '太子',   'role': '太子',     'duty': '飞书消息分拣与回奏',  'emoji': '🤴'},  # 兼容旧配置
+    'main':     {'label': '太子',   'role': '太子',     'duty': '飞书消息分拣与回奏',  'emoji': '🤴'},
     'zhongshu': {'label': '中书省', 'role': '中书令',   'duty': '起草任务令与优先级',  'emoji': '📜'},
     'menxia':   {'label': '门下省', 'role': '侍中',     'duty': '审议与退回机制',      'emoji': '🔍'},
     'shangshu': {'label': '尚书省', 'role': '尚书令',   'duty': '派单与升级裁决',      'emoji': '📮'},
@@ -110,7 +110,7 @@ def main():
         })
         seen_ids.add(ag_id)
 
-    # 补充不在 openclaw.json agents list 中的 agent（兼容旧版 main）
+    #  openclaw.json agents list  agent（ main）
     EXTRA_AGENTS = {
         'taizi':   {'model': default_model, 'workspace': str(pathlib.Path.home() / '.openclaw/workspace-taizi'),
                     'allowAgents': ['zhongshu']},
@@ -146,13 +146,13 @@ def main():
     atomic_json_write(DATA / 'agent_config.json', payload)
     log.info(f'{len(result)} agents synced')
 
-    # 自动部署 SOUL.md 到 workspace（如果项目里有更新）
+    #  SOUL.md  workspace（）
     deploy_soul_files()
-    # 同步 scripts/ 到各 workspace（保持 kanban_update.py 等最新）
+    #  scripts/  workspace（ kanban_update.py ）
     sync_scripts_to_workspaces()
 
 
-# 项目 agents/ 目录名 → 运行时 agent_id 映射
+#  agents/  →  agent_id 
 _SOUL_DEPLOY_MAP = {
     'taizi': 'taizi',
     'zhongshu': 'zhongshu',
@@ -220,7 +220,7 @@ def deploy_soul_files():
             continue
         ws_dst = pathlib.Path.home() / f'.openclaw/workspace-{runtime_id}' / 'soul.md'
         ws_dst.parent.mkdir(parents=True, exist_ok=True)
-        # 只在内容不同时更新（避免不必要的写入）
+        # （）
         src_text = src.read_text(encoding='utf-8', errors='ignore')
         try:
             dst_text = ws_dst.read_text(encoding='utf-8', errors='ignore')
@@ -229,7 +229,7 @@ def deploy_soul_files():
         if src_text != dst_text:
             ws_dst.write_text(src_text, encoding='utf-8')
             deployed += 1
-        # 太子兼容：同步一份到 legacy main agent 目录
+        # ： legacy main agent 
         if runtime_id == 'taizi':
             ag_dst = pathlib.Path.home() / '.openclaw/agents/main/SOUL.md'
             ag_dst.parent.mkdir(parents=True, exist_ok=True)
@@ -239,7 +239,7 @@ def deploy_soul_files():
                 ag_text = ''
             if src_text != ag_text:
                 ag_dst.write_text(src_text, encoding='utf-8')
-        # 确保 sessions 目录存在
+        #  sessions 
         sess_dir = pathlib.Path.home() / f'.openclaw/agents/{runtime_id}/sessions'
         sess_dir.mkdir(parents=True, exist_ok=True)
     if deployed:

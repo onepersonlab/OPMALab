@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(message
 
 DATA = pathlib.Path(__file__).resolve().parent.parent / 'data'
 
-# ── RSS 源配置 ──────────────────────────────────────────────────────────
+# ── RSS  ──────────────────────────────────────────────────────────
 FEEDS = {
     '政治': [
         ('BBC World', 'https://feeds.bbci.co.uk/news/world/rss.xml'),
@@ -63,7 +63,7 @@ def _safe_parse_xml(xml_text, max_size=5*1024*1024):
     if len(xml_text) > max_size:
         log.warning(f'XML 内容过大 ({len(xml_text)} bytes)，跳过')
         return None
-    # 剥离 DOCTYPE / ENTITY 声明以防 XXE
+    #  DOCTYPE / ENTITY  XXE
     cleaned = re.sub(r'<!DOCTYPE[^>]*>', '', xml_text, flags=re.IGNORECASE)
     cleaned = re.sub(r'<!ENTITY[^>]*>', '', cleaned, flags=re.IGNORECASE)
     try:
@@ -89,7 +89,7 @@ def parse_rss(xml_text):
             desc  = re.sub(r'<[^>]+>', '', get('description'))[:200]
             link  = get('link')
             pub   = get('pubDate')
-            # 图片
+
             img = ''
             enc = item.find('enclosure')
             if enc is not None and 'image' in (enc.get('type') or ''):
@@ -127,7 +127,7 @@ def fetch_category(category, feeds, max_items=5):
                 continue
             if item['link'] in seen_urls:
                 continue
-            # 军事和AI分类需要关键词过滤
+            # AI
             if category in CATEGORY_KEYWORDS and not match_category(item, category):
                 continue
             seen_urls.add(item['link'])
@@ -149,17 +149,17 @@ def main():
     parser.add_argument('--force', action='store_true', help='强制采集，忽略幂等锁')
     args = parser.parse_args()
 
-    # 幂等锁：防重复执行
+    # ：
     today = datetime.date.today().strftime('%Y%m%d')
     lock_file = DATA / f'morning_brief_{today}.lock'
     if lock_file.exists() and not args.force:
         age = datetime.datetime.now().timestamp() - lock_file.stat().st_mtime
-        if age < 3600:  # 1小时内不重复
+        if age < 3600:  # 1
             log.info(f'今日已采集（{today}），跳过（使用 --force 强制采集）')
             return
-    # 注意：lock 放到采集成功后再 touch，防止失败也锁定
+    # ：lock  touch，
 
-    # 读取用户配置
+
     config_file = DATA / 'morning_brief_config.json'
     config = {}
     try:
@@ -167,7 +167,7 @@ def main():
     except Exception:
         pass
 
-    # 已启用的分类
+
     enabled_cats = set()
     if config.get('categories'):
         for c in config['categories']:
@@ -176,10 +176,10 @@ def main():
     else:
         enabled_cats = set(FEEDS.keys())
 
-    # 用户自定义关键词（全局加权）
+    # （）
     user_keywords = [kw.lower() for kw in config.get('keywords', [])]
 
-    # 合并自定义 RSS 源
+    #  RSS 
     custom_feeds = config.get('custom_feeds', [])
     merged_feeds = {}
     for cat, feeds in FEEDS.items():
@@ -189,7 +189,7 @@ def main():
         cat = cf.get('category', '')
         feed_url = cf.get('url', '')
         if cat in enabled_cats and feed_url:
-            # 校验自定义源 URL（SSRF 防护）
+            #  URL（SSRF ）
             if validate_url(feed_url):
                 merged_feeds.setdefault(cat, []).append((cf.get('name', '自定义'), feed_url))
             else:
@@ -222,18 +222,18 @@ def main():
         result['categories'][category] = items
         log.info(f'    {category}: {len(items)} 条')
 
-    # 写入今日文件
+
     today_file = DATA / f'morning_brief_{today}.json'
     atomic_json_write(today_file, result)
 
-    # 覆写 latest（看板读这个）
+    #  latest（）
     latest_file = DATA / 'morning_brief.json'
     atomic_json_write(latest_file, result)
 
     total = sum(len(v) for v in result['categories'].values())
     log.info(f'✅ 完成：共 {total} 条新闻 → {today_file.name}')
 
-    # 采集成功后才写入幂等锁
+
     lock_file.touch()
 
 if __name__ == '__main__':

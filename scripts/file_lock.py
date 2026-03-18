@@ -4,10 +4,10 @@
 用法:
     from file_lock import atomic_json_update, atomic_json_read
 
-    # 原子读取
+
     data = atomic_json_read(path, default=[])
 
-    # 原子更新（读 → 修改 → 写回，全程持锁）
+    # （ →  → ，）
     def modifier(tasks):
         tasks.append(new_task)
         return tasks 

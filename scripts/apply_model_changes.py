@@ -88,7 +88,7 @@ def main():
             log.info(f'gateway restart rc={r.returncode}')
         except Exception as e:
             log.error(f'gateway restart failed: {e}')
-            # 回滚配置
+
             if bak.exists():
                 shutil.copy2(bak, OPENCLAW_CFG)
                 log.warning('rolled back openclaw.json from backup')

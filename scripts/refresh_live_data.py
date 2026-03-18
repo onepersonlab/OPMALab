@@ -19,10 +19,10 @@ def output_meta(path):
 
 
 def main():
-    # 使用 officials_stats.json（与 sync_officials_stats.py 统一）
+    #  officials_stats.json（ sync_officials_stats.py ）
     officials_data = read_json(DATA / 'officials_stats.json', {})
     officials = officials_data.get('officials', []) if isinstance(officials_data, dict) else officials_data
-    # 任务源优先：tasks_source.json（可对接外部系统同步写入）
+    # ：tasks_source.json（）
     tasks = atomic_json_read(DATA / 'tasks_source.json', [])
     if not tasks:
         tasks = read_json(DATA / 'tasks.json', [])
@@ -40,7 +40,7 @@ def main():
         t['org'] = t.get('org') or org_map.get(t.get('official', ''), '')
         t['outputMeta'] = output_meta(t.get('output', ''))
 
-        # 心跳时效检测：对 Doing/Assigned 状态的任务标注活跃度
+        # ： Doing/Assigned 
         if t.get('state') in ('Doing', 'Assigned', 'Review'):
             updated_raw = t.get('updatedAt') or t.get('sourceMeta', {}).get('updatedAt')
             age_sec = None

@@ -139,7 +139,7 @@ def build_task(agent_id, session_key, row, now_ms):
     channel = row.get('lastChannel') or (row.get('origin') or {}).get('channel') or '-'
     session_file = row.get('sessionFile', '')
     
-    # 尝试从 activity 获取更有意义的当前状态描述
+    #  activity 
     latest_act = '等待指令'
     acts = load_activity(session_file, limit=5)
     
@@ -161,7 +161,7 @@ def build_task(agent_id, session_key, row, now_ms):
              latest_act = acts[0]['text'][:60]
     
     title_label = (row.get('origin') or {}).get('label') or session_key
-    # 清洗会话标题：agent:xxx:cron:uuid → 定时任务, agent:xxx:subagent:uuid → 子任务
+    # ：agent:xxx:cron:uuid → , agent:xxx:subagent:uuid → 
     import re
     if re.match(r'agent:\w+:cron:', title_label):
         title = f"{org}定时任务"
@@ -236,7 +236,7 @@ def main():
                         continue
                     tasks.append(build_task(agent_id, session_key, row, now_ms))
 
-        # merge mission control tasks (最小接入)
+        # merge mission control tasks ()
         mc_tasks_file = DATA / 'mission_control_tasks.json'
         if mc_tasks_file.exists():
             try:
@@ -246,7 +246,7 @@ def main():
             except Exception:
                 pass
 
-        # merge manual parallel tasks (用于军机处并行看板展示)
+        # merge manual parallel tasks ()
         manual_tasks_file = DATA / 'manual_parallel_tasks.json'
         if manual_tasks_file.exists():
             try:
@@ -258,7 +258,7 @@ def main():
 
         tasks.sort(key=lambda x: x.get('sourceMeta', {}).get('updatedAt', 0), reverse=True)
 
-        # 去重（同一 id 只保留第一个=最新的）
+        # （ id =）
         seen_ids = set()
         deduped = []
         for t in tasks:
@@ -267,53 +267,53 @@ def main():
                 deduped.append(t)
         tasks = deduped
 
-        # ── 过滤掉非 JJC 且非活跃的系统会话，防止看板噪音 ──
-        # 规则: 仅保留 24小时内更新的活跃会话，且排除 cron/subagent 等纯后台任务
+        # ──  JJC ， ──
+        # :  24， cron/subagent 
         filtered_tasks = []
         one_day_ago = now_ms - 24 * 3600 * 1000
         for t in tasks:
-            # 始终保留 JJC 任务（如果有的话，虽然这里主要是 OC 任务，但以防万一）
+            #  JJC （， OC ，）
             if str(t['id']).startswith('JJC'):
                 filtered_tasks.append(t)
                 continue
             
-            # OC 任务过滤
+            # OC 
             updated = t.get('sourceMeta', {}).get('updatedAt', 0)
             title = t.get('title', '')
             
-            # 1. 排除太旧的 (超过24小时)
+            # 1.  (24)
             if updated < one_day_ago:
                 continue
             
-            # 2. 排除纯后台 cron / subagent 任务，除非它们正在报错
+            # 2.  cron / subagent ，
             if '定时任务' in title or '子任务' in title:
-                # 只有当它 block 或者 error 时才显示，否则视为噪音
+                #  block  error ，
                 if t.get('state') != 'Blocked':
                     continue
 
-            # 3. 排除非活跃的 OC 会话 (超过 5 分钟无响应)，避免污染看板
-            # 除非它是 Blocked (报错)，或者是今天新建的
+            # 3.  OC  ( 5 )，
+            #  Blocked ()，
             state = t.get('state')
             # state_from_session: < 2min = Doing, < 60min = Review, else = Next
             if state not in ('Doing', 'Blocked'):
-                # 如果不是正在进行或报错，就隐藏掉
-                # 特例: 如果是 mission control (mc-) 的心跳，可能也没必要显示，除非 Doing
+                # ，
+                # :  mission control (mc-) ，， Doing
                 continue
 
             filtered_tasks.append(t)
         
         tasks = filtered_tasks
         
-        # ── 保留已有的 JJC-* 旨意任务（不覆盖皇上下旨记录）──
-        # JJC 任务的 now 字段由 Agent 自己通过 kanban_update.py progress 命令主动上报，
-        # 不再从会话日志中被动抓取。这里只做合并，不做 activity 映射。
+        # ──  JJC-* （）──
+        # JJC  now  Agent  kanban_update.py progress ，
+        # 。， activity 。
         existing_tasks_file = DATA / 'tasks_source.json'
         if existing_tasks_file.exists():
             try:
                 existing = json.loads(existing_tasks_file.read_text())
                 jjc_existing = [t for t in existing if str(t.get('id', '')).startswith('JJC')]
                 
-                # 去掉 tasks 里已有的 JJC（以防重复），再把旨意放到最前面
+                #  tasks  JJC（），
                 tasks = [t for t in tasks if not str(t.get('id', '')).startswith('JJC')]
                 tasks = jjc_existing + tasks
             except Exception as e:
