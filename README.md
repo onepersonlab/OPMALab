@@ -261,23 +261,6 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - 📱 **Mobile**: PWA, mobile responsiveness
 - 📊 **Analytics**: Agent performance metrics, cost tracking
 
-### Development Setup
-
-```bash
-# Fork and clone
-git clone https://github.com/onepersonlab/OPMALab.git
-cd OPMALab
-
-# Install dependencies (if any)
-pip install -r requirements.txt  # Coming soon
-
-# Run tests
-python3 -m pytest tests/
-
-# Start development server
-python3 dashboard/server.py
-```
-
 ---
 
 ## 📄 License
