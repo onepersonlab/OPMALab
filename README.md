@@ -1,8 +1,8 @@
-# 🧪 OnePersonLab-Agents
+# 🧪 OPMALab
 
-## AI-Driven Multi-Discipline Research Collaboration Platform
+## One-person-multi-agent laboratory (OPMALab)
 
-An One-person-multi-agent laboratory for interdisciplinary scientific research. Each agent is a specialized researcher with defined expertise, communication protocols, and deliverables.
+One-person-multi-agent laboratory (OPMALab) for interdisciplinary scientific research. Each agent is a specialized researcher with defined expertise, communication protocols, and deliverables.
 
 **12 AI Agents** (4 coordination roles + 8 discipline PIs) form a complete research workflow: Lab Director triages, Planning Office designs, Review Board approves, Operations Office coordinates, and 8 Discipline PIs execute.
 
