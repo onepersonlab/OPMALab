@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+"""
+Refresh live dashboard data from tasks_source.json and officials stats
+Output: data/live_status.json
+"""
 import json, pathlib, datetime, logging
 from file_lock import atomic_json_write, atomic_json_read
 from utils import read_json
@@ -19,16 +23,18 @@ def output_meta(path):
 
 
 def main():
-    #  officials_stats.json（ sync_officials_stats.py ）
+    # Load officials stats (from sync_officials_stats.py)
     officials_data = read_json(DATA / 'officials_stats.json', {})
     officials = officials_data.get('officials', []) if isinstance(officials_data, dict) else officials_data
-    # ：tasks_source.json（）
+    
+    # Load tasks from tasks_source.json (primary source)
     tasks = atomic_json_read(DATA / 'tasks_source.json', [])
     if not tasks:
         tasks = read_json(DATA / 'tasks.json', [])
 
     sync_status = read_json(DATA / 'sync_status.json', {})
 
+    # Build org label map
     org_map = {}
     for o in officials:
         label = o.get('label', o.get('name', ''))
@@ -40,7 +46,7 @@ def main():
         t['org'] = t.get('org') or org_map.get(t.get('official', ''), '')
         t['outputMeta'] = output_meta(t.get('output', ''))
 
-        # ： Doing/Assigned 
+        # Calculate heartbeat for active tasks
         if t.get('state') in ('Doing', 'Assigned', 'Review'):
             updated_raw = t.get('updatedAt') or t.get('sourceMeta', {}).get('updatedAt')
             age_sec = None
@@ -54,16 +60,17 @@ def main():
                 except Exception:
                     pass
             if age_sec is None:
-                t['heartbeat'] = {'status': 'unknown', 'label': '⚪ 未知', 'ageSec': None}
+                t['heartbeat'] = {'status': 'unknown', 'label': '⚪ Unknown', 'ageSec': None}
             elif age_sec < 180:
-                t['heartbeat'] = {'status': 'active', 'label': f'🟢 活跃 {int(age_sec//60)}分钟前', 'ageSec': int(age_sec)}
+                t['heartbeat'] = {'status': 'active', 'label': f'🟢 Active {int(age_sec//60)}m ago', 'ageSec': int(age_sec)}
             elif age_sec < 600:
-                t['heartbeat'] = {'status': 'warn', 'label': f'🟡 可能停滞 {int(age_sec//60)}分钟前', 'ageSec': int(age_sec)}
+                t['heartbeat'] = {'status': 'warn', 'label': f'🟡 Possibly stalled {int(age_sec//60)}m ago', 'ageSec': int(age_sec)}
             else:
-                t['heartbeat'] = {'status': 'stalled', 'label': f'🔴 已停滞 {int(age_sec//60)}分钟', 'ageSec': int(age_sec)}
+                t['heartbeat'] = {'status': 'stalled', 'label': f'🔴 Stalled {int(age_sec//60)}m', 'ageSec': int(age_sec)}
         else:
             t['heartbeat'] = None
 
+    # Calculate metrics
     today_str = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
     def _is_today_done(t):
         if t.get('state') != 'Done':
@@ -76,21 +83,23 @@ def main():
         if isinstance(lm, str) and lm[:10] == today_str:
             return True
         return False
+    
     today_done = sum(1 for t in tasks if _is_today_done(t))
     total_done = sum(1 for t in tasks if t.get('state') == 'Done')
     in_progress = sum(1 for t in tasks if t.get('state') in ['Doing', 'Review', 'Next', 'Blocked'])
     blocked = sum(1 for t in tasks if t.get('state') == 'Blocked')
 
+    # Build history (completed tasks)
     history = []
     for t in tasks:
         if t.get('state') == 'Done':
             lm = t.get('outputMeta', {}).get('lastModified')
             history.append({
-                'at': lm or '未知',
+                'at': lm or 'Unknown',
                 'official': t.get('official'),
                 'task': t.get('title'),
                 'out': t.get('output'),
-                'qa': '通过' if t.get('outputMeta', {}).get('exists') else '待补成果'
+                'qa': 'Pass' if t.get('outputMeta', {}).get('exists') else 'Pending output'
             })
 
     payload = {
@@ -115,7 +124,7 @@ def main():
     }
 
     atomic_json_write(DATA / 'live_status.json', payload)
-    log.info(f'updated live_status.json ({len(tasks)} tasks)')
+    log.info(f'Updated live_status.json ({len(tasks)} tasks)')
 
 
 if __name__ == '__main__':

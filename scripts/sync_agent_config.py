@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-同步 openclaw.json 中的 agent 配置 → data/agent_config.json
-支持自动发现 agent workspace 下的 Skills 目录
+Synchronize agent configuration from openclaw.json → data/agent_config.json
+Supports auto-discovery of skills in agent workspace directories
+
+OPMALab Version: Supports 12 agents (4 Coordination Roles + 8 Discipline PIs)
 """
 import json, pathlib, datetime, logging
 from file_lock import atomic_json_write
@@ -14,19 +16,26 @@ BASE = pathlib.Path(__file__).parent.parent
 DATA = BASE / 'data'
 OPENCLAW_CFG = pathlib.Path.home() / '.openclaw' / 'openclaw.json'
 
+# ═══════════════════════════════════════════════════════════════
+# OPMALab · 12 Agent Configuration
+# 4 Coordination Roles + 8 Discipline PIs
+# ═══════════════════════════════════════════════════════════════
 ID_LABEL = {
-    'taizi':    {'label': '太子',   'role': '太子',     'duty': '飞书消息分拣与回奏',  'emoji': '🤴'},
-    'main':     {'label': '太子',   'role': '太子',     'duty': '飞书消息分拣与回奏',  'emoji': '🤴'},
-    'zhongshu': {'label': '中书省', 'role': '中书令',   'duty': '起草任务令与优先级',  'emoji': '📜'},
-    'menxia':   {'label': '门下省', 'role': '侍中',     'duty': '审议与退回机制',      'emoji': '🔍'},
-    'shangshu': {'label': '尚书省', 'role': '尚书令',   'duty': '派单与升级裁决',      'emoji': '📮'},
-    'libu':     {'label': '礼部',   'role': '礼部尚书', 'duty': '文档/汇报/规范',      'emoji': '📝'},
-    'hubu':     {'label': '户部',   'role': '户部尚书', 'duty': '资源/预算/成本',      'emoji': '💰'},
-    'bingbu':   {'label': '兵部',   'role': '兵部尚书', 'duty': '应急与巡检',          'emoji': '⚔️'},
-    'xingbu':   {'label': '刑部',   'role': '刑部尚书', 'duty': '合规/审计/红线',      'emoji': '⚖️'},
-    'gongbu':   {'label': '工部',   'role': '工部尚书', 'duty': '工程交付与自动化',    'emoji': '🔧'},
-    'libu_hr':  {'label': '吏部',   'role': '吏部尚书', 'duty': '人事/培训/Agent管理',  'emoji': '👔'},
-    'zaochao':  {'label': '钦天监', 'role': '朝报官',   'duty': '每日新闻采集与简报',  'emoji': '📰'},
+    # Coordination Roles (4)
+    'lab_director':    {'label': 'Lab Director',    'role': 'Lab Director',    'duty': 'Message triage and task creation',                   'emoji': '🎓'},
+    'planning_office': {'label': 'Planning Office', 'role': 'Planning Director', 'duty': 'Research strategy and task decomposition',           'emoji': '📋'},
+    'review_board':    {'label': 'Review Board',    'role': 'Review Chair',      'duty': 'Quality review and veto mechanism',                  'emoji': '🔍'},
+    'operations_office': {'label': 'Operations Office', 'role': 'Operations Director', 'duty': 'Task assignment and coordination reporting',   'emoji': '📮'},
+    
+    # Discipline PIs (8)
+    'pi_cs':   {'label': 'PI-CS',   'role': 'Computer Science PI', 'duty': 'AI/ML, Software Engineering, Data Systems',       'emoji': '🖥️'},
+    'pi_chem': {'label': 'PI-Chem', 'role': 'Chemistry PI',        'duty': 'Organic, Inorganic, Analytical, Computational Chemistry', 'emoji': '🧪'},
+    'pi_bio':  {'label': 'PI-Bio',  'role': 'Biology PI',          'duty': 'Molecular Biology, Genetics, Bioinformatics',     'emoji': '🧬'},
+    'pi_mat':  {'label': 'PI-Mat',  'role': 'Materials Science PI','duty': 'Nanomaterials, Polymers, Composites',             'emoji': '🔩'},
+    'pi_med':  {'label': 'PI-Med',  'role': 'Medicine PI',         'duty': 'Drug Discovery, Clinical Research, Medical Imaging', 'emoji': '🏥'},
+    'pi_agr':  {'label': 'PI-Agr',  'role': 'Agriculture PI',      'duty': 'Crop Science, Precision Agriculture, Food Security', 'emoji': '🌾'},
+    'pi_env':  {'label': 'PI-Env',  'role': 'Environmental Science PI', 'duty': 'Climate, Ecology, Pollution, Sustainability', 'emoji': '🌍'},
+    'pi_eng':  {'label': 'PI-Eng',  'role': 'Engineering PI',      'duty': 'Mechanical, Electrical, Chemical, Civil Engineering', 'emoji': '⚙️'},
 }
 
 KNOWN_MODELS = [
@@ -35,7 +44,7 @@ KNOWN_MODELS = [
     {'id': 'anthropic/claude-haiku-3-5',  'label': 'Claude Haiku 3.5',  'provider': 'Anthropic'},
     {'id': 'openai/gpt-4o',               'label': 'GPT-4o',            'provider': 'OpenAI'},
     {'id': 'openai/gpt-4o-mini',          'label': 'GPT-4o Mini',       'provider': 'OpenAI'},
-    {'id': 'openai-codex/gpt-5.3-codex',  'label': 'GPT-5.3 Codex',    'provider': 'OpenAI Codex'},
+    {'id': 'openai-codex/gpt-5.3-codex',  'label': 'GPT-5.3 Codex',     'provider': 'OpenAI Codex'},
     {'id': 'google/gemini-2.0-flash',     'label': 'Gemini 2.0 Flash',  'provider': 'Google'},
     {'id': 'google/gemini-2.5-pro',       'label': 'Gemini 2.5 Pro',    'provider': 'Google'},
     {'id': 'copilot/claude-sonnet-4',     'label': 'Claude Sonnet 4',   'provider': 'Copilot'},
@@ -72,10 +81,10 @@ def get_skills(workspace: str):
                                     desc = line[:100]
                                     break
                         except Exception:
-                            desc = '(读取失败)'
+                            desc = '(read failed)'
                     skills.append({'name': d.name, 'path': str(md), 'exists': md.exists(), 'description': desc})
     except PermissionError as e:
-        log.warning(f'Skills 目录访问受限: {e}')
+        log.warning(f'Skills directory access denied: {e}')
     return skills
 
 
@@ -110,31 +119,9 @@ def main():
         })
         seen_ids.add(ag_id)
 
-    #  openclaw.json agents list  agent（ main）
-    EXTRA_AGENTS = {
-        'taizi':   {'model': default_model, 'workspace': str(pathlib.Path.home() / '.openclaw/workspace-taizi'),
-                    'allowAgents': ['zhongshu']},
-        'main':    {'model': default_model, 'workspace': str(pathlib.Path.home() / '.openclaw/workspace-main'),
-                    'allowAgents': ['zhongshu','menxia','shangshu','hubu','libu','bingbu','xingbu','gongbu','libu_hr']},
-        'zaochao': {'model': default_model, 'workspace': str(pathlib.Path.home() / '.openclaw/workspace-zaochao'),
-                    'allowAgents': []},
-        'libu_hr': {'model': default_model, 'workspace': str(pathlib.Path.home() / '.openclaw/workspace-libu_hr'),
-                    'allowAgents': ['shangshu']},
-    }
-    for ag_id, extra in EXTRA_AGENTS.items():
-        if ag_id in seen_ids or ag_id not in ID_LABEL:
-            continue
-        meta = ID_LABEL[ag_id]
-        result.append({
-            'id': ag_id,
-            'label': meta['label'], 'role': meta['role'], 'duty': meta['duty'], 'emoji': meta['emoji'],
-            'model': extra['model'],
-            'defaultModel': default_model,
-            'workspace': extra['workspace'],
-            'skills': get_skills(extra['workspace']),
-            'allowAgents': extra['allowAgents'],
-            'isDefaultModel': True,
-        })
+    # OPMALab: No automatic addition of extra agents
+    # All agents must be explicitly configured in openclaw.json agents.list
+    # This prevents accidental creation of unwanted workspaces
 
     payload = {
         'generatedAt': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -146,29 +133,33 @@ def main():
     atomic_json_write(DATA / 'agent_config.json', payload)
     log.info(f'{len(result)} agents synced')
 
-    #  SOUL.md  workspace（）
+    # Deploy SOUL.md to workspaces
     deploy_soul_files()
-    #  scripts/  workspace（ kanban_update.py ）
+    # Sync scripts/ to workspaces
     sync_scripts_to_workspaces()
 
 
-#  agents/  →  agent_id 
+# ═══════════════════════════════════════════════════════════════
+# OPMALab · SOUL File Deployment Map
+# Maps project agents/xxx → workspace-xxx
+# ═══════════════════════════════════════════════════════════════
 _SOUL_DEPLOY_MAP = {
-    'taizi': 'taizi',
-    'zhongshu': 'zhongshu',
-    'menxia': 'menxia',
-    'shangshu': 'shangshu',
-    'libu': 'libu',
-    'hubu': 'hubu',
-    'bingbu': 'bingbu',
-    'xingbu': 'xingbu',
-    'gongbu': 'gongbu',
-    'libu_hr': 'libu_hr',
-    'zaochao': 'zaochao',
+    'lab_director':    'lab_director',
+    'planning_office': 'planning_office',
+    'review_board':    'review_board',
+    'operations_office': 'operations_office',
+    'pi_cs':   'pi_cs',
+    'pi_chem': 'pi_chem',
+    'pi_bio':  'pi_bio',
+    'pi_mat':  'pi_mat',
+    'pi_med':  'pi_med',
+    'pi_agr':  'pi_agr',
+    'pi_env':  'pi_env',
+    'pi_eng':  'pi_eng',
 }
 
 def sync_scripts_to_workspaces():
-    """将项目 scripts/ 目录同步到各 agent workspace（保持 kanban_update.py 等最新）"""
+    """Sync project scripts/ directory to each OPMALab agent workspace"""
     scripts_src = BASE / 'scripts'
     if not scripts_src.is_dir():
         return
@@ -191,36 +182,21 @@ def sync_scripts_to_workspaces():
             if src_text != dst_text:
                 dst_file.write_bytes(src_text)
                 synced += 1
-    # also sync to workspace-main for legacy compatibility
-    ws_main_scripts = pathlib.Path.home() / '.openclaw/workspace-main/scripts'
-    ws_main_scripts.mkdir(parents=True, exist_ok=True)
-    for src_file in scripts_src.iterdir():
-        if src_file.suffix not in ('.py', '.sh') or src_file.stem.startswith('__'):
-            continue
-        dst_file = ws_main_scripts / src_file.name
-        try:
-            src_text = src_file.read_bytes()
-            dst_text = dst_file.read_bytes() if dst_file.exists() else b''
-            if src_text != dst_text:
-                dst_file.write_bytes(src_text)
-                synced += 1
-        except Exception:
-            pass
     if synced:
-        log.info(f'{synced} script files synced to workspaces')
+        log.info(f'{synced} script files synced to OPMALab workspaces')
 
 
 def deploy_soul_files():
-    """将项目 agents/xxx/SOUL.md 部署到 ~/.openclaw/workspace-xxx/soul.md"""
+    """Deploy project agents/xxx/SOUL.md to ~/.openclaw/workspace-xxx/SOUL.md"""
     agents_dir = BASE / 'agents'
     deployed = 0
     for proj_name, runtime_id in _SOUL_DEPLOY_MAP.items():
         src = agents_dir / proj_name / 'SOUL.md'
         if not src.exists():
             continue
-        ws_dst = pathlib.Path.home() / f'.openclaw/workspace-{runtime_id}' / 'soul.md'
+        ws_dst = pathlib.Path.home() / f'.openclaw/workspace-{runtime_id}' / 'SOUL.md'
         ws_dst.parent.mkdir(parents=True, exist_ok=True)
-        # （）
+        # Compare content to avoid unnecessary writes
         src_text = src.read_text(encoding='utf-8', errors='ignore')
         try:
             dst_text = ws_dst.read_text(encoding='utf-8', errors='ignore')
@@ -229,21 +205,11 @@ def deploy_soul_files():
         if src_text != dst_text:
             ws_dst.write_text(src_text, encoding='utf-8')
             deployed += 1
-        # ： legacy main agent 
-        if runtime_id == 'taizi':
-            ag_dst = pathlib.Path.home() / '.openclaw/agents/main/SOUL.md'
-            ag_dst.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                ag_text = ag_dst.read_text(encoding='utf-8', errors='ignore')
-            except FileNotFoundError:
-                ag_text = ''
-            if src_text != ag_text:
-                ag_dst.write_text(src_text, encoding='utf-8')
-        #  sessions 
+        # Create sessions directory for each agent
         sess_dir = pathlib.Path.home() / f'.openclaw/agents/{runtime_id}/sessions'
         sess_dir.mkdir(parents=True, exist_ok=True)
     if deployed:
-        log.info(f'{deployed} SOUL.md files deployed')
+        log.info(f'{deployed} SOUL.md files deployed to OPMALab workspaces')
 
 
 if __name__ == '__main__':

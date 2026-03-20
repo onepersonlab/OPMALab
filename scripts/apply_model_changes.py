@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""应用 data/pending_model_changes.json → openclaw.json，并重启 Gateway"""
+"""
+Apply pending model changes from data/pending_model_changes.json → openclaw.json
+Restarts Gateway after successful application
+"""
 import json, pathlib, subprocess, datetime, shutil, logging, glob
 from file_lock import atomic_json_write, atomic_json_read
 
@@ -22,7 +25,7 @@ def rj(path, default):
 
 
 def cleanup_backups():
-    """只保留最近 MAX_BACKUPS 个备份"""
+    """Keep only the most recent MAX_BACKUPS backups."""
     pattern = str(OPENCLAW_CFG.parent / 'openclaw.json.bak.model-*')
     baks = sorted(glob.glob(pattern))
     for old in baks[:-MAX_BACKUPS]:
@@ -58,19 +61,27 @@ def main():
                     ag.pop('model', None)
                 else:
                     ag['model'] = new_model
-                applied.append({'at': datetime.datetime.now().isoformat(), 'agentId': ag_id, 'oldModel': old, 'newModel': new_model})
+                applied.append({
+                    'at': datetime.datetime.now().isoformat(), 
+                    'agentId': ag_id, 
+                    'oldModel': old, 
+                    'newModel': new_model
+                })
                 found = True
                 break
         if not found:
             errors.append({'change': change, 'error': f'agent {ag_id} not found'})
 
     if applied:
+        # Create backup
         bak = OPENCLAW_CFG.parent / f'openclaw.json.bak.model-{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}'
         shutil.copy2(OPENCLAW_CFG, bak)
         cleanup_backups()
+        
         cfg['agents']['list'] = agents_list
         atomic_json_write(OPENCLAW_CFG, cfg)
 
+        # Log changes
         log_data = rj(CHANGE_LOG, [])
         log_data.extend(applied)
         if len(log_data) > 200:
@@ -80,6 +91,7 @@ def main():
         for e in applied:
             log.info(f'{e["agentId"]}: {e["oldModel"]} → {e["newModel"]}')
 
+        # Restart Gateway
         restart_ok = False
         rollback = False
         try:
@@ -89,6 +101,7 @@ def main():
         except Exception as e:
             log.error(f'gateway restart failed: {e}')
 
+            # Rollback on failure
             if bak.exists():
                 shutil.copy2(bak, OPENCLAW_CFG)
                 log.warning('rolled back openclaw.json from backup')
@@ -96,11 +109,14 @@ def main():
                 for a in applied:
                     a['rolledBack'] = True
 
+        # Clear pending changes
         atomic_json_write(PENDING, [])
         atomic_json_write(DATA / 'last_model_change_result.json', {
             'at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'applied': applied, 'errors': errors,
-            'gatewayRestarted': restart_ok, 'rolledBack': rollback,
+            'applied': applied, 
+            'errors': errors,
+            'gatewayRestarted': restart_ok, 
+            'rolledBack': rollback,
         })
     elif errors:
         log.warning(f'{len(errors)} changes failed, 0 applied')

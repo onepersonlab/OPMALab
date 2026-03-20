@@ -1,16 +1,17 @@
+#!/usr/bin/env python3
 """
-文件锁工具 — 防止多进程并发读写 JSON 文件导致数据丢失。
+File Lock Utility — Prevents data loss from concurrent JSON file access.
 
-用法:
+Usage:
     from file_lock import atomic_json_update, atomic_json_read
 
-
+    # Read with shared lock
     data = atomic_json_read(path, default=[])
 
-    # （ →  → ，）
+    # Atomic update (read → modify → write with exclusive lock)
     def modifier(tasks):
         tasks.append(new_task)
-        return tasks 
+        return tasks
     atomic_json_update(path, modifier, default=[])
 """
 import fcntl
@@ -26,7 +27,7 @@ def _lock_path(path: pathlib.Path) -> pathlib.Path:
 
 
 def atomic_json_read(path: pathlib.Path, default: Any = None) -> Any:
-    """持锁读取 JSON 文件。"""
+    """Read JSON file with shared lock."""
     lock_file = _lock_path(path)
     lock_file.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(lock_file), os.O_CREAT | os.O_RDWR)
@@ -47,9 +48,9 @@ def atomic_json_update(
     default: Any = None,
 ) -> Any:
     """
-    原子地读取 → 修改 → 写回 JSON 文件。
-    modifier(data) 应返回修改后的数据。
-    使用临时文件 + rename 保证写入原子性。
+    Atomically read → modify → write back JSON file.
+    modifier(data) should return the modified data.
+    Uses temp file + rename for atomic write.
     """
     lock_file = _lock_path(path)
     lock_file.parent.mkdir(parents=True, exist_ok=True)
@@ -81,8 +82,8 @@ def atomic_json_update(
 
 
 def atomic_json_write(path: pathlib.Path, data: Any) -> None:
-    """原子写入 JSON 文件（持排他锁 + tmpfile rename）。
-    直接写入，不读取现有内容（避免 atomic_json_update 的多余读开销）。
+    """Atomic JSON write (exclusive lock + temp file rename).
+    Direct write without reading existing content (avoids extra read overhead).
     """
     lock_file = _lock_path(path)
     lock_file.parent.mkdir(parents=True, exist_ok=True)

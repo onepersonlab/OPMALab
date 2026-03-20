@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
+"""
+Sync OpenClaw runtime sessions → data/tasks_source.json
+Maps active sessions to task entries for dashboard display
+"""
 import json
 import pathlib
 import time
 import datetime
 import traceback
 import logging
+import re
 from file_lock import atomic_json_write, atomic_json_read
 
 log = logging.getLogger('sync_runtime')
@@ -15,6 +20,22 @@ DATA = BASE / 'data'
 DATA.mkdir(exist_ok=True)
 SYNC_STATUS = DATA / 'sync_status.json'
 SESSIONS_ROOT = pathlib.Path.home() / '.openclaw' / 'agents'
+
+# OPMALab agent mapping
+OFFICIAL_MAP = {
+    'lab_director':    ('Lab Director', 'Lab Director'),
+    'planning_office': ('Planning Director', 'Planning Office'),
+    'review_board':    ('Review Chair', 'Review Board'),
+    'operations_office': ('Operations Director', 'Operations Office'),
+    'pi_cs':   ('Computer Science PI', 'PI-CS'),
+    'pi_chem': ('Chemistry PI', 'PI-Chem'),
+    'pi_bio':  ('Biology PI', 'PI-Bio'),
+    'pi_mat':  ('Materials Science PI', 'PI-Mat'),
+    'pi_med':  ('Medicine PI', 'PI-Med'),
+    'pi_agr':  ('Agriculture PI', 'PI-Agr'),
+    'pi_env':  ('Environmental Science PI', 'PI-Env'),
+    'pi_eng':  ('Engineering PI', 'PI-Eng'),
+}
 
 
 def write_status(**kwargs):
@@ -41,21 +62,7 @@ def state_from_session(age_ms, aborted):
 
 
 def detect_official(agent_id):
-    mapping = {
-        'main':    ('储君', '太子'),        # legacy id for taizi
-        'taizi':   ('储君', '太子'),
-        'zhongshu': ('中书令', '中书省'),
-        'menxia':  ('侍中', '门下省'),
-        'shangshu': ('尚书令', '尚书省'),
-        'hubu':    ('户部尚书', '户部'),
-        'libu':    ('礼部尚书', '礼部'),
-        'bingbu':  ('兵部尚书', '兵部'),
-        'xingbu':  ('刑部尚书', '刑部'),
-        'gongbu':  ('工部尚书', '工部'),
-        'libu_hr': ('吏部尚书', '吏部'),
-        'zaochao': ('钦天监', '朝报司'),
-    }
-    return mapping.get(agent_id, ('尚书令', '尚书省'))
+    return OFFICIAL_MAP.get(agent_id, ('Operations Director', 'Operations Office'))
 
 
 def load_activity(session_file, limit=12):
@@ -78,7 +85,6 @@ def load_activity(session_file, limit=12):
             continue
 
     # Process events to extract meaningful activity
-    # We want to show what the agent is *thinking* or *doing*
     for item in reversed(events):
         msg = item.get('message') or {}
         role = msg.get('role')
@@ -87,7 +93,6 @@ def load_activity(session_file, limit=12):
         if role == 'toolResult':
             tool = msg.get('toolName', '-')
             details = msg.get('details') or {}
-            # If tool output is short, show it
             content = msg.get('content', [{'text': ''}])[0].get('text', '')
             if len(content) < 50:
                 text = f"Tool '{tool}' returned: {content}"
@@ -100,31 +105,27 @@ def load_activity(session_file, limit=12):
             for c in msg.get('content', []):
                 if c.get('type') == 'text' and c.get('text'):
                     raw_text = c.get('text').strip()
-                    # Clean up common prefixes
                     clean_text = raw_text.replace('[[reply_to_current]]', '').strip()
                     if clean_text:
                         text = clean_text
                     break
             if text:
-                # Prioritize showing the "thought" - usually the first few sentences
                 summary = text.split('\n')[0]
                 if len(summary) > 200:
                     summary = summary[:200] + '...'
                 rows.append({'at': ts, 'kind': 'assistant', 'text': summary})
                 
         elif role == 'user':
-             # Also show what user asked, can be context relevant
-             text = ''
-             for c in msg.get('content', []):
+            text = ''
+            for c in msg.get('content', []):
                 if c.get('type') == 'text':
-                     text = c.get('text', '')[:100]
-             if text:
-                 rows.append({'at': ts, 'kind': 'user', 'text': f"User: {text}..."})
+                    text = c.get('text', '')[:100]
+            if text:
+                rows.append({'at': ts, 'kind': 'user', 'text': f"User: {text}..."})
 
         if len(rows) >= limit:
             break
 
-    # Re-order to chronological for display if needed, but the caller usually takes the first (latest)
     return rows
 
 
@@ -139,55 +140,51 @@ def build_task(agent_id, session_key, row, now_ms):
     channel = row.get('lastChannel') or (row.get('origin') or {}).get('channel') or '-'
     session_file = row.get('sessionFile', '')
     
-    #  activity 
-    latest_act = '等待指令'
+    # Build activity summary
+    latest_act = 'Waiting for input'
     acts = load_activity(session_file, limit=5)
     
-    # If the absolute latest is a tool result, look for the preceding assistant thought
-    # because that explains *why* the tool was called.
     if acts:
         first_act = acts[0]
         if first_act['kind'] == 'tool' and len(acts) > 1:
-            # Look for next assistant message (which is actually previous in time)
             for next_act in acts[1:]:
                 if next_act['kind'] == 'assistant':
-                    latest_act = f"正在执行: {next_act['text'][:80]}"
+                    latest_act = f"Executing: {next_act['text'][:80]}"
                     break
             else:
                 latest_act = first_act['text'][:60]
         elif first_act['kind'] == 'assistant':
-             latest_act = f"思考中: {first_act['text'][:80]}"
+            latest_act = f"Thinking: {first_act['text'][:80]}"
         else:
-             latest_act = acts[0]['text'][:60]
+            latest_act = acts[0]['text'][:60]
     
     title_label = (row.get('origin') or {}).get('label') or session_key
-    # ：agent:xxx:cron:uuid → , agent:xxx:subagent:uuid → 
-    import re
+    
     if re.match(r'agent:\w+:cron:', title_label):
-        title = f"{org}定时任务"
+        title = f"{org} Scheduled Task"
     elif re.match(r'agent:\w+:subagent:', title_label):
-        title = f"{org}子任务"
+        title = f"{org} Subtask"
     elif title_label == session_key or len(title_label) > 40:
-        title = f"{org}会话"
+        title = f"{org} Session"
     else:
         title = f"{title_label}"
     
     return {
-        'id': f"OC-{agent_id}-{str(session_id)[:8]}",
+        'id': f"OPL-{agent_id}-{str(session_id)[:8]}",
         'title': title,
         'official': official,
         'org': org,
         'state': state,
         'now': latest_act,
         'eta': ms_to_str(updated_at),
-        'block': '上次运行中断' if aborted else '无',
+        'block': 'Last run interrupted' if aborted else 'None',
         'output': session_file,
         'flow': {
             'draft': f"agent={agent_id}",
             'review': f"updatedAt={ms_to_str(updated_at)}",
             'dispatch': f"sessionKey={session_key}",
         },
-        'ac': '来自 OpenClaw runtime sessions 的实时映射',
+        'ac': 'Real-time mapping from OpenClaw runtime sessions',
         'activity': load_activity(session_file, limit=10),
         'sourceMeta': {
             'agentId': agent_id,
@@ -218,136 +215,50 @@ def main():
                 if not agent_dir.is_dir():
                     continue
                 agent_id = agent_dir.name
+                
+                # Only process OPMALab agents
+                if agent_id not in OFFICIAL_MAP:
+                    continue
+                
                 sessions_file = agent_dir / 'sessions' / 'sessions.json'
                 if not sessions_file.exists():
                     continue
-                scan_files += 1
-
-                try:
-                    raw = json.loads(sessions_file.read_text())
-                except Exception:
-                    continue
-
-                if not isinstance(raw, dict):
-                    continue
-
-                for session_key, row in raw.items():
-                    if not isinstance(row, dict):
-                        continue
-                    tasks.append(build_task(agent_id, session_key, row, now_ms))
-
-        # merge mission control tasks ()
-        mc_tasks_file = DATA / 'mission_control_tasks.json'
-        if mc_tasks_file.exists():
-            try:
-                mc_tasks = json.loads(mc_tasks_file.read_text())
-                if isinstance(mc_tasks, list):
-                    tasks.extend(mc_tasks)
-            except Exception:
-                pass
-
-        # merge manual parallel tasks ()
-        manual_tasks_file = DATA / 'manual_parallel_tasks.json'
-        if manual_tasks_file.exists():
-            try:
-                manual_tasks = json.loads(manual_tasks_file.read_text())
-                if isinstance(manual_tasks, list):
-                    tasks.extend(manual_tasks)
-            except Exception:
-                pass
-
-        tasks.sort(key=lambda x: x.get('sourceMeta', {}).get('updatedAt', 0), reverse=True)
-
-        # （ id =）
-        seen_ids = set()
-        deduped = []
-        for t in tasks:
-            if t['id'] not in seen_ids:
-                seen_ids.add(t['id'])
-                deduped.append(t)
-        tasks = deduped
-
-        # ──  JJC ， ──
-        # :  24， cron/subagent 
-        filtered_tasks = []
-        one_day_ago = now_ms - 24 * 3600 * 1000
-        for t in tasks:
-            #  JJC （， OC ，）
-            if str(t['id']).startswith('JJC'):
-                filtered_tasks.append(t)
-                continue
-            
-            # OC 
-            updated = t.get('sourceMeta', {}).get('updatedAt', 0)
-            title = t.get('title', '')
-            
-            # 1.  (24)
-            if updated < one_day_ago:
-                continue
-            
-            # 2.  cron / subagent ，
-            if '定时任务' in title or '子任务' in title:
-                #  block  error ，
-                if t.get('state') != 'Blocked':
-                    continue
-
-            # 3.  OC  ( 5 )，
-            #  Blocked ()，
-            state = t.get('state')
-            # state_from_session: < 2min = Doing, < 60min = Review, else = Next
-            if state not in ('Doing', 'Blocked'):
-                # ，
-                # :  mission control (mc-) ，， Doing
-                continue
-
-            filtered_tasks.append(t)
-        
-        tasks = filtered_tasks
-        
-        # ──  JJC-* （）──
-        # JJC  now  Agent  kanban_update.py progress ，
-        # 。， activity 。
-        existing_tasks_file = DATA / 'tasks_source.json'
-        if existing_tasks_file.exists():
-            try:
-                existing = json.loads(existing_tasks_file.read_text())
-                jjc_existing = [t for t in existing if str(t.get('id', '')).startswith('JJC')]
                 
-                #  tasks  JJC（），
-                tasks = [t for t in tasks if not str(t.get('id', '')).startswith('JJC')]
-                tasks = jjc_existing + tasks
-            except Exception as e:
-                log.error(f'merge existing JJC tasks failed: {e}')
-                pass
+                scan_files += 1
+                sessions_data = rj(sessions_file, {})
+                
+                for session_key, row in sessions_data.items():
+                    task = build_task(agent_id, session_key, row, now_ms)
+                    tasks.append(task)
 
+        # Write to tasks_source.json
         atomic_json_write(DATA / 'tasks_source.json', tasks)
-
+        
         duration_ms = int((time.time() - start) * 1000)
         write_status(
             ok=True,
-            lastSyncAt=now,
+            at=now,
             durationMs=duration_ms,
-            source='openclaw_runtime_sessions',
-            recordCount=len(tasks),
-            scannedSessionFiles=scan_files,
-            missingFields={},
-            error=None,
+            tasksCount=len(tasks),
+            filesScanned=scan_files,
         )
-        log.info(f'synced {len(tasks)} tasks from openclaw runtime in {duration_ms}ms')
+        log.info(f'Synced {len(tasks)} tasks from {scan_files} agents in {duration_ms}ms')
 
     except Exception as e:
-        duration_ms = int((time.time() - start) * 1000)
+        log.error(f'Sync failed: {e}')
+        traceback.print_exc()
         write_status(
             ok=False,
-            lastSyncAt=now,
-            durationMs=duration_ms,
-            source='openclaw_runtime_sessions',
-            recordCount=0,
-            missingFields={},
-            error=f'{type(e).__name__}: {e}',
-            traceback=traceback.format_exc(limit=3),
+            at=now,
+            error=str(e),
         )
-        raise
+
+
+def rj(path, default):
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return default
 
 
 if __name__ == '__main__':

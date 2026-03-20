@@ -1,13 +1,13 @@
 #!/bin/bash
-# OnePersonLab-Agents · Data Refresh Loop
+# OPMALab · Data Refresh Loop
 # Usage: ./run_loop.sh [interval_seconds]  (default: 15)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTERVAL="${1:-15}"
-LOG="/tmp/scilab_refresh.log"
-PIDFILE="/tmp/scilab_refresh.pid"
+LOG="/tmp/opmalab_refresh.log"
+PIDFILE="/tmp/opmalab_refresh.pid"
 MAX_LOG_SIZE=$((10 * 1024 * 1024))  # 10MB
 
 # Single instance protection
@@ -37,7 +37,7 @@ rotate_log() {
   fi
 }
 
-echo "🧪 OnePersonLab-Agents Data Refresh Loop (PID=$$)"
+echo "🧪 OPMALab Data Refresh Loop (PID=$$)"
 echo "   Script Dir: $SCRIPT_DIR"
 echo "   Interval: ${INTERVAL}s"
 echo "   Log: $LOG"

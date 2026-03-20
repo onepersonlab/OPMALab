@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""同步各官员统计数据 → data/officials_stats.json"""
+"""
+Synchronize agent statistics → data/officials_stats.json
+Scans sessions.json for token usage, calculates costs, aggregates task stats
+"""
 import json, pathlib, datetime, logging
 from file_lock import atomic_json_write
 
@@ -11,29 +14,31 @@ DATA = BASE / 'data'
 AGENTS_ROOT = pathlib.Path.home() / '.openclaw' / 'agents'
 OPENCLAW_CFG = pathlib.Path.home() / '.openclaw' / 'openclaw.json'
 
-# Anthropic （1M token，）
+# Model pricing (per 1M tokens, USD)
 MODEL_PRICING = {
-    'anthropic/claude-sonnet-4-6':  {'in':3.0, 'out':15.0, 'cr':0.30, 'cw':3.75},
-    'anthropic/claude-opus-4-5':    {'in':15.0,'out':75.0, 'cr':1.50, 'cw':18.75},
-    'anthropic/claude-haiku-3-5':   {'in':0.8, 'out':4.0,  'cr':0.08, 'cw':1.0},
-    'openai/gpt-4o':                {'in':2.5, 'out':10.0, 'cr':1.25, 'cw':0},
-    'openai/gpt-4o-mini':           {'in':0.15,'out':0.6,  'cr':0.075,'cw':0},
-    'google/gemini-2.0-flash':      {'in':0.075,'out':0.3, 'cr':0,    'cw':0},
-    'google/gemini-2.5-pro':        {'in':1.25,'out':10.0, 'cr':0,    'cw':0},
+    'anthropic/claude-sonnet-4-6':  {'in': 3.0,  'out': 15.0, 'cr': 0.30, 'cw': 3.75},
+    'anthropic/claude-opus-4-5':    {'in': 15.0, 'out': 75.0, 'cr': 1.50, 'cw': 18.75},
+    'anthropic/claude-haiku-3-5':   {'in': 0.8,  'out': 4.0,  'cr': 0.08, 'cw': 1.0},
+    'openai/gpt-4o':                {'in': 2.5,  'out': 10.0, 'cr': 1.25, 'cw': 0},
+    'openai/gpt-4o-mini':           {'in': 0.15, 'out': 0.6,  'cr': 0.075, 'cw': 0},
+    'google/gemini-2.0-flash':      {'in': 0.075,'out': 0.3,  'cr': 0,    'cw': 0},
+    'google/gemini-2.5-pro':        {'in': 1.25, 'out': 10.0, 'cr': 0,    'cw': 0},
 }
 
+# OPMALab 12 agents
 OFFICIALS = [
-    {'id':'taizi',   'label':'太子',  'role':'太子',    'emoji':'🤴','rank':'储君'},
-    {'id':'zhongshu','label':'中书省','role':'中书令',  'emoji':'📜','rank':'正一品'},
-    {'id':'menxia',  'label':'门下省','role':'侍中',    'emoji':'🔍','rank':'正一品'},
-    {'id':'shangshu','label':'尚书省','role':'尚书令',  'emoji':'📮','rank':'正一品'},
-    {'id':'libu',    'label':'礼部',  'role':'礼部尚书','emoji':'📝','rank':'正二品'},
-    {'id':'hubu',    'label':'户部',  'role':'户部尚书','emoji':'💰','rank':'正二品'},
-    {'id':'bingbu',  'label':'兵部',  'role':'兵部尚书','emoji':'⚔️','rank':'正二品'},
-    {'id':'xingbu',  'label':'刑部',  'role':'刑部尚书','emoji':'⚖️','rank':'正二品'},
-    {'id':'gongbu',  'label':'工部',  'role':'工部尚书','emoji':'🔧','rank':'正二品'},
-    {'id':'libu_hr', 'label':'吏部',  'role':'吏部尚书','emoji':'👔','rank':'正二品'},
-    {'id':'zaochao', 'label':'钦天监','role':'朝报官',  'emoji':'📰','rank':'正三品'},
+    {'id': 'lab_director',    'label': 'Lab Director',    'role': 'Lab Director',    'emoji': '🎓', 'rank': 'Coordination'},
+    {'id': 'planning_office', 'label': 'Planning Office', 'role': 'Planning Director', 'emoji': '📋', 'rank': 'Coordination'},
+    {'id': 'review_board',    'label': 'Review Board',    'role': 'Review Chair',      'emoji': '🔍', 'rank': 'Coordination'},
+    {'id': 'operations_office', 'label': 'Operations Office', 'role': 'Operations Director', 'emoji': '📮', 'rank': 'Coordination'},
+    {'id': 'pi_cs',   'label': 'PI-CS',   'role': 'Computer Science PI', 'emoji': '🖥️', 'rank': 'Discipline PI'},
+    {'id': 'pi_chem', 'label': 'PI-Chem', 'role': 'Chemistry PI',        'emoji': '🧪', 'rank': 'Discipline PI'},
+    {'id': 'pi_bio',  'label': 'PI-Bio',  'role': 'Biology PI',          'emoji': '🧬', 'rank': 'Discipline PI'},
+    {'id': 'pi_mat',  'label': 'PI-Mat',  'role': 'Materials Science PI','emoji': '🔩', 'rank': 'Discipline PI'},
+    {'id': 'pi_med',  'label': 'PI-Med',  'role': 'Medicine PI',         'emoji': '🏥', 'rank': 'Discipline PI'},
+    {'id': 'pi_agr',  'label': 'PI-Agr',  'role': 'Agriculture PI',      'emoji': '🌾', 'rank': 'Discipline PI'},
+    {'id': 'pi_env',  'label': 'PI-Env',  'role': 'Environmental Science PI', 'emoji': '🌍', 'rank': 'Discipline PI'},
+    {'id': 'pi_eng',  'label': 'PI-Eng',  'role': 'Engineering PI',      'emoji': '⚙️', 'rank': 'Discipline PI'},
 ]
 
 def rj(p, d):
@@ -64,18 +69,11 @@ def get_model(agent_id):
     for a in cfg.get('agents',{}).get('list',[]):
         if a.get('id') == agent_id:
             return normalize_model(a.get('model', default), default)
-    # ： main  id
-    if agent_id == 'taizi':
-        for a in cfg.get('agents',{}).get('list',[]):
-            if a.get('id') == 'main':
-                return normalize_model(a.get('model', default), default)
     return default
 
 def scan_agent(agent_id):
-    """从 sessions.json 读取 token 统计（累计所有 session）"""
+    """Read token statistics from sessions.json (aggregate all sessions)"""
     sj = AGENTS_ROOT / agent_id / 'sessions' / 'sessions.json'
-    if not sj.exists() and agent_id == 'taizi':
-        sj = AGENTS_ROOT / 'main' / 'sessions' / 'sessions.json'
     if not sj.exists():
         return {'tokens_in':0,'tokens_out':0,'cache_read':0,'cache_write':0,'sessions':0,'last_active':None,'messages':0}
     
@@ -135,10 +133,10 @@ def get_task_stats(org_label, tasks):
     active = [t for t in tasks if t.get('state') in ('Doing','Review','Assigned') and t.get('org')==org_label]
     fl = sum(1 for t in tasks for f in t.get('flow_log',[])
              if f.get('from')==org_label or f.get('to')==org_label)
-    # （JJC）
+    # Collect participated tasks (OPL prefix)
     participated = []
     for t in tasks:
-        if not t['id'].startswith('JJC'): continue
+        if not t['id'].startswith('OPL'): continue
         for f in t.get('flow_log',[]):
             if f.get('from')==org_label or f.get('to')==org_label:
                 if t['id'] not in [x['id'] for x in participated]:
@@ -151,7 +149,7 @@ def get_hb(agent_id, live_tasks):
     for t in live_tasks:
         if t.get('sourceMeta',{}).get('agentId')==agent_id and t.get('heartbeat'):
             return t['heartbeat']
-    return {'status':'idle','label':'⚪ 待命','ageSec':None}
+    return {'status':'idle','label':'⚪ Idle','ageSec':None}
 
 def main():
     tasks = rj(DATA/'tasks_source.json', [])
@@ -169,45 +167,21 @@ def main():
         result.append({
             **off,
             'model': model,
-            'model_short': model.split('/')[-1] if isinstance(model, str) and '/' in model else str(model),
-            'sessions': ss['sessions'],
-            'tokens_in': ss['tokens_in'],
-            'tokens_out': ss['tokens_out'],
-            'cache_read': ss['cache_read'],
-            'cache_write': ss['cache_write'],
-            'tokens_total': ss['tokens_in'] + ss['tokens_out'],
-            'messages': ss['messages'],
-            'cost_usd': cost_usd,
-            'cost_cny': round(cost_usd * 7.25, 2),
-            'last_active': ss['last_active'],
+            'model_short': model.split('/')[-1] if isinstance(model, str) and '/' in model else model,
+            'stats': ss,
+            'cost': {'model': model, 'totalUsd': cost_usd},
+            'tasks': ts,
             'heartbeat': hb,
-            'tasks_done': ts['tasks_done'],
-            'tasks_active': ts['tasks_active'],
-            'flow_participations': ts['flow_participations'],
-            'participated_edicts': ts['participated_edicts'],
-            'merit_score': ts['tasks_done']*10 + ts['flow_participations']*2 + min(ss['sessions'],20),
         })
-
-    result.sort(key=lambda x: x['merit_score'], reverse=True)
-    for i, r in enumerate(result): r['merit_rank'] = i+1
-
-    totals = {
-        'tokens_total': sum(r['tokens_total'] for r in result),
-        'cache_total':  sum(r['cache_read']+r['cache_write'] for r in result),
-        'cost_usd':     round(sum(r['cost_usd'] for r in result), 2),
-        'cost_cny':     round(sum(r['cost_cny'] for r in result), 2),
-        'tasks_done':   sum(r['tasks_done'] for r in result),
-    }
-    top = max(result, key=lambda x: x['merit_score'], default={})
 
     payload = {
         'generatedAt': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'officials': result,
-        'totals': totals,
-        'top_official': top.get('label',''),
     }
-    atomic_json_write(DATA/'officials_stats.json', payload)
-    log.info(f'{len(result)} officials | cost=¥{totals["cost_cny"]} | top={top.get("label","")}')
+    DATA.mkdir(exist_ok=True)
+    atomic_json_write(DATA / 'officials_stats.json', payload)
+    log.info(f'{len(result)} officials synced')
+
 
 if __name__ == '__main__':
     main()

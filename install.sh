@@ -15,8 +15,8 @@ banner() {
   echo ""
   echo -e "${BLUE}╔══════════════════════════════════════════════╗${NC}"
   echo -e "${BLUE}║  🧪  OnePersonLab-Agents · OnePersonLab           ║${NC}"
-  echo -e "${BLUE}║       Multi-Agent Multi-Agent Platform          ║${NC}"
-  echo -e "${BLUE}║       Installation Wizard                    ║${NC}"
+  echo -e "${BLUE}║       Multi-Agent Platform                      ║${NC}"
+  echo -e "${BLUE}║       Installation Wizard                       ║${NC}"
   echo -e "${BLUE}╚══════════════════════════════════════════════╝${NC}"
   echo ""
 }
@@ -96,7 +96,7 @@ register_agents() {
   info "Registering OnePersonLab-Agents..."
 
   # Backup config
-  cp "$OC_CFG" "$OC_CFG.bak.scilab-$(date +%Y%m%d-%H%M%S)"
+  cp "$OC_CFG" "$OC_CFG.bak.opmalab-$(date +%Y%m%d-%H%M%S)"
   log "Config backed up: $OC_CFG.bak.*"
 
   python3 << 'PYEOF'
@@ -107,8 +107,8 @@ cfg = json.loads(cfg_path.read_text())
 
 # OnePersonLab-Agents: 12 roles with permission matrix
 # Based on protocols/permissions.md
-AGENTS = [
-    # Coordination Roles
+OPMALAB_AGENTS = [
+    # Coordination Roles (4)
     {"id": "lab_director",    "subagents": {"allowAgents": ["planning_office"]}},
     {"id": "planning_office", "subagents": {"allowAgents": ["review_board"]}},
     {"id": "review_board",    "subagents": {"allowAgents": ["operations_office", "planning_office"]}},
@@ -117,7 +117,7 @@ AGENTS = [
         "pi_med", "pi_agr", "pi_env", "pi_eng"
     ]}},
     
-    # Discipline PIs (8 departments)
+    # Discipline PIs (8)
     {"id": "pi_cs",      "subagents": {"allowAgents": ["operations_office"]}},
     {"id": "pi_chem",    "subagents": {"allowAgents": ["operations_office"]}},
     {"id": "pi_bio",     "subagents": {"allowAgents": ["operations_office"]}},
@@ -128,32 +128,48 @@ AGENTS = [
     {"id": "pi_eng",     "subagents": {"allowAgents": ["operations_office"]}},
 ]
 
-# Fresh install: clear ALL existing agents and start fresh
+# Get existing agents configuration
 agents_cfg = cfg.setdefault('agents', {})
-old_agents = agents_cfg.get('list', [])
-old_count = len(old_agents)
+existing_agents = agents_cfg.get('list', [])
 
-# Clear all agents - fresh start for OPMALab only
-agents_list = []
+# OPMALab agent IDs
+opmalab_ids = {ag['id'] for ag in OPMALAB_AGENTS}
 
-if old_count > 0:
-    print(f'  - cleared {old_count} old agents (fresh install)')
+# Keep existing agents that are NOT OPMALab agents (preserve other projects)
+# But remove any old OPMALab agents to avoid duplicates
+preserved_agents = []
+removed_count = 0
+for ag in existing_agents:
+    ag_id = ag.get('id', '')
+    if ag_id in opmalab_ids:
+        removed_count += 1
+        print(f'  - removed existing OPMALab agent: {ag_id}')
+    else:
+        preserved_agents.append(ag)
+        print(f'  ✓ preserved non-OPMALab agent: {ag_id}')
+
+if removed_count == 0 and len(existing_agents) == 0:
+    print('  (no existing agents)')
+
+# Build final agents list: preserved + OPMALab
+agents_list = preserved_agents
 
 # Register OPMALab agents
 added = 0
-for ag in AGENTS:
+for ag in OPMALAB_AGENTS:
     ag_id = ag['id']
     ws = str(pathlib.Path.home() / f'.openclaw/workspace-{ag_id}')
     entry = {'id': ag_id, 'workspace': ws, **{k:v for k,v in ag.items() if k!='id'}}
     agents_list.append(entry)
     added += 1
-    print(f'  + registered: {ag_id}')
+    print(f'  + registered OPMALab agent: {ag_id}')
 
-print(f'  ✓ {added} OPMALab agents registered (fresh install)')
+print(f'  ✓ {added} OPMALab agents registered')
+print(f'  ✓ {len(preserved_agents)} non-OPMALab agents preserved')
 
 agents_cfg['list'] = agents_list
 cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2))
-print(f'Done: {added} agents added')
+print(f'Done: {len(agents_list)} total agents in config')
 PYEOF
 
   log "Agents registered successfully"
@@ -254,5 +270,5 @@ echo "  3. Open dashboard:      http://127.0.0.1:9731"
 echo ""
 info "Documentation: README.md"
 echo ""
-echo "🧪 OnePersonLab-Agents: Governing research with ancient wisdom"
-echo "   https://github.com/onepersonlab/onepersonlab-agents"
+echo "🧪 OnePersonLab-Agents: Governing research with institutional oversight"
+echo "   https://github.com/onepersonlab/OPMALab"
